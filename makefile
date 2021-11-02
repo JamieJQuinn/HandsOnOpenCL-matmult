@@ -1,6 +1,6 @@
 exe=exe
 source_files=host.cpp
-CFLAGS=-std=c++17 -pthread -O3
+CFLAGS=-std=c++17 -pthread -O0 -g
 LDFLAGS=-lOpenCL
 
 all: ${exe}
