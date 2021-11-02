@@ -1,4 +1,4 @@
-__kernel void matmultnaive(
+__kernel void mat_mult_naive(
   const int N,
   __global float *A,
   __global float *B,

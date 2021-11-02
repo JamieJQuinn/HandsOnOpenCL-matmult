@@ -150,7 +150,6 @@ void run_seq(
 
   auto stop = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(stop - start);
-  std::cout << "N=" << N << ", duration (us)=" << int(duration.count()) << std::endl;
   double nflop = 2.0*N*N*N;
   std::cout << "N=" << N << ", MFLOPS=" << int(nflop/float(duration.count())) << std::endl;
 }
@@ -202,7 +201,6 @@ void run_ocl(
   auto stop = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(stop - start);
   double nflop = 2.0*N*N*N;
-  std::cout << "N=" << N << ", duration (us)=" << int(duration.count()) << std::endl;
   std::cout << "N=" << N << ", MFLOPS=" << int(nflop/float(duration.count())) << std::endl;
 }
 
@@ -222,7 +220,7 @@ int main() {
       cl::Context::getDefault(), cl::Device::getDefault());
 
   verify_seq();
-  verify_ocl("matmultnaive");
+  verify_ocl("mat_mult_naive");
 
   std::vector<int> Ns = {128, 256, 512};
 
@@ -230,8 +228,10 @@ int main() {
     std::vector<float> h_A(N*N), h_B(N*N), h_C(N*N), h_C_seq(N*N);
     load_random_data(h_A, h_B);
 
+    std::cout << "Seq:   ";
     run_seq(N, h_A, h_B, h_C_seq);
-    run_ocl("matmultnaive", N, h_A, h_B, h_C);
+    std::cout << "Naive: ";
+    run_ocl("mat_mult_naive", N, h_A, h_B, h_C);
     check_equal(h_C, h_C_seq);
   }
 }
