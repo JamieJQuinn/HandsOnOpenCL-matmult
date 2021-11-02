@@ -107,23 +107,25 @@ void check_test_result(std::vector<float>& C_in) {
   }
 }
 
+void run_seq_test_case() {
+  const int N = 3;
+
+  std::vector<float> h_A(N*N), h_B(N*N), h_C(N*N);
+  load_test_case(h_A, h_B);
+  mat_mult(N, h_A.data(), h_B.data(), h_C.data());
+  check_test_result(h_C);
+}
+
 int main() {
   const int N = 3;
 
-  int error = setDefaultPlatform();
-  if (error < 0) return -1;
+  //int error = setDefaultPlatform();
+  //if (error < 0) return -1;
 
   //cl::Program program = buildProgram("vadd.cl");
   //auto vadd = cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer>(program, "vadd");
 
-  std::vector<float> h_A(N*N), h_B(N*N), h_C(N*N);
-
-  load_test_case(h_A, h_B);
-
-  mat_mult(N, h_A.data(), h_B.data(), h_C.data());
-
-  check_test_result(h_C);
-
+  run_seq_test_case();
   //cl::DeviceCommandQueue deviceQueue = cl::DeviceCommandQueue::makeDefault(
       //cl::Context::getDefault(), cl::Device::getDefault());
 
