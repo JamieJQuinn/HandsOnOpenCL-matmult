@@ -43,23 +43,29 @@ __kernel void mat_mult_1d(
   }
 }
 
-__kernel void mat_mult_1d_row_copy(
+__kernel void mat_mult_1d_col_copy(
   const int N,
   __global float *A,
   __global float *B,
   __global float *C,
-  __global float *Awrk
+  __local float *Bwrk
 ) {
-  int i=get_global_id(0);
-  for(int k=0; k<N; ++k) {
-    Awrk[k] = A[i*N+k];
-  }
+  int i = get_global_id(0);
+  int iloc = get_local_id(0);
+  int nloc = get_local_size(0);
 
   for(int j=0; j<N; ++j) {
+    for(int k=iloc; k<N; k+=nloc) {
+      Bwrk[k] = B[k*N+j];
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
     float tmp = 0.0;
     for(int k=0; k<N; ++k) {
-      tmp += A[i*N+k]*B[k*N+j];
+      tmp += A[i*N+k]*Bwrk[k];
     }
     C[i*N+j] = tmp;
   }
+
+  barrier(CLK_LOCAL_MEM_FENCE);
 }

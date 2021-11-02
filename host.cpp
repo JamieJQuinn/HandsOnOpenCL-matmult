@@ -91,8 +91,8 @@ void mat_mult(int N, float *A, float *B, float *C) {
 
 void load_random_data(std::vector<float>& A_in, std::vector<float>& B_in) {
   for(int i=0; i<A_in.size(); ++i) {
-    A_in[i] = i%10;
-    B_in[i] = (i-5)%10;
+    A_in[i] = i%10-5;
+    B_in[i] = (i-5)%10-5;
   }
 }
 
@@ -232,7 +232,7 @@ void run_1d_ocl(
   std::cout << "N=" << N << ", MFLOPS=" << int(nflop/float(duration.count())) << std::endl;
 }
 
-void run_1d_row_copy_ocl(
+void run_1d_wrk_ocl(
     const std::string& kernelName,
     const int N,
     std::vector<float>& h_A,
@@ -242,16 +242,16 @@ void run_1d_row_copy_ocl(
   cl::Buffer d_A = cl::Buffer(h_A.begin(), h_A.end(), true);
   cl::Buffer d_B = cl::Buffer(h_B.begin(), h_B.end(), true);
   cl::Buffer d_C = cl::Buffer(CL_MEM_READ_WRITE, sizeof(float)*h_C.size());
-  cl::Buffer d_Awrk = cl::Buffer(CL_MEM_READ_WRITE, sizeof(float)*N);
+  cl::LocalSpaceArg d_wrk = cl::Local(sizeof(float)*N);
 
   cl::Program program = buildProgram("mat_mult.cl");
   auto mat_mult_cl = cl::KernelFunctor<
-    int, cl::Buffer, cl::Buffer, cl::Buffer, cl::Buffer
+    int, cl::Buffer, cl::Buffer, cl::Buffer, cl::LocalSpaceArg
     >(program, kernelName);
 
   auto start = high_resolution_clock::now();
 
-  mat_mult_cl(cl::EnqueueArgs(cl::NDRange(N), cl::NDRange(N/16)), N, d_A, d_B, d_C, d_Awrk);
+  mat_mult_cl(cl::EnqueueArgs(cl::NDRange(N), cl::NDRange(N/4)), N, d_A, d_B, d_C, d_wrk);
 
   cl::copy(d_C, h_C.begin(), h_C.end());
 
@@ -263,6 +263,7 @@ void run_1d_row_copy_ocl(
 
 void check_equal(const std::vector<float>& a, const std::vector<float>& b) {
   for (int i=0; i<a.size(); ++i) {
+    std::cout << a[i] << ", " << b[i] << std::endl;
     assert(std::abs(a[i]-b[i]) < EPSILON);
   }
 }
@@ -278,7 +279,7 @@ int main() {
 
   verify_seq();
 
-  std::vector<int> Ns = {128, 256, 512};
+  std::vector<int> Ns = {128, 256, 512, 1024};
 
   for (auto N : Ns) {
     std::vector<float> h_A(N*N), h_B(N*N), h_C(N*N), h_C_seq(N*N);
@@ -299,8 +300,8 @@ int main() {
     run_1d_ocl("mat_mult_1d", N, h_A, h_B, h_C);
     check_equal(h_C, h_C_seq);
 
-    std::cout << "1D rc:  ";
-    run_1d_row_copy_ocl("mat_mult_1d_row_copy", N, h_A, h_B, h_C);
+    std::cout << "1D cc:  ";
+    run_1d_wrk_ocl("mat_mult_1d_col_copy", N, h_A, h_B, h_C);
     check_equal(h_C, h_C_seq);
   }
 }
