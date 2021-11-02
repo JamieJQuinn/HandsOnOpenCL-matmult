@@ -204,6 +204,63 @@ void run_ocl(
   std::cout << "N=" << N << ", MFLOPS=" << int(nflop/float(duration.count())) << std::endl;
 }
 
+void run_1d_ocl(
+    const std::string& kernelName,
+    const int N,
+    std::vector<float>& h_A,
+    std::vector<float>& h_B,
+    std::vector<float>& h_C)
+{
+  cl::Buffer d_A = cl::Buffer(h_A.begin(), h_A.end(), true);
+  cl::Buffer d_B = cl::Buffer(h_B.begin(), h_B.end(), true);
+  cl::Buffer d_C = cl::Buffer(CL_MEM_READ_WRITE, sizeof(float)*h_C.size());
+
+  cl::Program program = buildProgram("mat_mult.cl");
+  auto mat_mult_cl = cl::KernelFunctor<
+    int, cl::Buffer, cl::Buffer, cl::Buffer
+    >(program, kernelName);
+
+  auto start = high_resolution_clock::now();
+
+  mat_mult_cl(cl::EnqueueArgs(cl::NDRange(N), cl::NDRange(N/16)), N, d_A, d_B, d_C);
+
+  cl::copy(d_C, h_C.begin(), h_C.end());
+
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  double nflop = 2.0*N*N*N;
+  std::cout << "N=" << N << ", MFLOPS=" << int(nflop/float(duration.count())) << std::endl;
+}
+
+void run_1d_row_copy_ocl(
+    const std::string& kernelName,
+    const int N,
+    std::vector<float>& h_A,
+    std::vector<float>& h_B,
+    std::vector<float>& h_C)
+{
+  cl::Buffer d_A = cl::Buffer(h_A.begin(), h_A.end(), true);
+  cl::Buffer d_B = cl::Buffer(h_B.begin(), h_B.end(), true);
+  cl::Buffer d_C = cl::Buffer(CL_MEM_READ_WRITE, sizeof(float)*h_C.size());
+  cl::Buffer d_Awrk = cl::Buffer(CL_MEM_READ_WRITE, sizeof(float)*N);
+
+  cl::Program program = buildProgram("mat_mult.cl");
+  auto mat_mult_cl = cl::KernelFunctor<
+    int, cl::Buffer, cl::Buffer, cl::Buffer, cl::Buffer
+    >(program, kernelName);
+
+  auto start = high_resolution_clock::now();
+
+  mat_mult_cl(cl::EnqueueArgs(cl::NDRange(N), cl::NDRange(N/16)), N, d_A, d_B, d_C, d_Awrk);
+
+  cl::copy(d_C, h_C.begin(), h_C.end());
+
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  double nflop = 2.0*N*N*N;
+  std::cout << "N=" << N << ", MFLOPS=" << int(nflop/float(duration.count())) << std::endl;
+}
+
 void check_equal(const std::vector<float>& a, const std::vector<float>& b) {
   for (int i=0; i<a.size(); ++i) {
     assert(std::abs(a[i]-b[i]) < EPSILON);
@@ -220,8 +277,6 @@ int main() {
       cl::Context::getDefault(), cl::Device::getDefault());
 
   verify_seq();
-  verify_ocl("mat_mult_naive");
-  verify_ocl("mat_mult_local_var");
 
   std::vector<int> Ns = {128, 256, 512};
 
@@ -238,6 +293,14 @@ int main() {
 
     std::cout << "Local: ";
     run_ocl("mat_mult_local_var", N, h_A, h_B, h_C);
+    check_equal(h_C, h_C_seq);
+
+    std::cout << "1D:    ";
+    run_1d_ocl("mat_mult_1d", N, h_A, h_B, h_C);
+    check_equal(h_C, h_C_seq);
+
+    std::cout << "1D rc:  ";
+    run_1d_row_copy_ocl("mat_mult_1d_row_copy", N, h_A, h_B, h_C);
     check_equal(h_C, h_C_seq);
   }
 }
