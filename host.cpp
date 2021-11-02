@@ -60,50 +60,93 @@ cl::Program buildProgram(const std::string& filename) {
   return program;
 }
 
-void setArrayTo(std::vector<int>& arr, int val, int N) {
-  for(int i=0; i<N; ++i) {
-    arr[i] = val;
+inline int idx(int i, int j, int N) {
+  return i*N+j;
+}
+
+void mat_mult(int N, float *A, float *B, float *C) {
+  for (int i=0; i<N; ++i) {
+    for (int j=0; j<N; ++j) {
+      C[idx(i,j,N)] = 0.0f;
+      for(int k=0; k<N; ++k) {
+        // C(i,j) = sum_k A(i,k)*B(k,i)
+        C[idx(i,j,N)] += A[idx(i,k,N)]*B[idx(k,j,N)];
+      }
+    }
+  }
+}
+
+void load_test_case(std::vector<float>& A_in, std::vector<float>& B_in) {
+  float A[] = {
+    5,  6,  3,
+    7,  2, -2,
+    4, -1,  8
+  };
+
+  float B[] = {
+    -3, 0, 1,
+     3, 5, 6,
+    -2, 4, 7
+  };
+
+  for (int i=0; i<3*3; ++i) {
+    A_in[i] = A[i];
+    B_in[i] = B[i];
+  }
+}
+
+void check_test_result(std::vector<float>& C_in) {
+  float C[] = {
+    -3, 42, 62,
+    -11, 2, 5,
+    -31, 27, 54
+  };
+
+  for(int i=0; i<3*3; ++i) {
+    assert(C[i] == C_in[i]);
   }
 }
 
 int main() {
-  const int N = 2^6;
-  const int WORKGROUP_SIZE = 2^4;
+  const int N = 3;
 
   int error = setDefaultPlatform();
   if (error < 0) return -1;
 
-  cl::Program program = buildProgram("vadd.cl");
-  auto vadd = cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer>(program, "vadd");
+  //cl::Program program = buildProgram("vadd.cl");
+  //auto vadd = cl::KernelFunctor<cl::Buffer, cl::Buffer, cl::Buffer>(program, "vadd");
 
-  std::vector<int> h_a(N), h_b(N), h_c(N);
+  std::vector<float> h_A(N*N), h_B(N*N), h_C(N*N);
 
-  cl::DeviceCommandQueue deviceQueue = cl::DeviceCommandQueue::makeDefault(
-      cl::Context::getDefault(), cl::Device::getDefault());
+  load_test_case(h_A, h_B);
+
+  mat_mult(N, h_A.data(), h_B.data(), h_C.data());
+
+  check_test_result(h_C);
+
+  //cl::DeviceCommandQueue deviceQueue = cl::DeviceCommandQueue::makeDefault(
+      //cl::Context::getDefault(), cl::Device::getDefault());
 
   // a = 1; b = 2
-  setArrayTo(h_a, 1, N);
-  setArrayTo(h_b, 2, N);
+  //setArrayTo(h_a, 1, N);
+  //setArrayTo(h_b, 2, N);
 
   // Create buffers and copy data
-  cl::Buffer d_a = cl::Buffer(h_a.begin(), h_a.end(), false);
-  cl::Buffer d_b = cl::Buffer(h_b.begin(), h_b.end(), false);
-  cl::Buffer d_c = cl::Buffer(CL_MEM_READ_WRITE, sizeof(int)*N);
+  //cl::Buffer d_a = cl::Buffer(h_a.begin(), h_a.end(), false);
+  //cl::Buffer d_b = cl::Buffer(h_b.begin(), h_b.end(), false);
+  //cl::Buffer d_c = cl::Buffer(CL_MEM_READ_WRITE, sizeof(int)*N);
 
-  // c = a+b
-  vadd(cl::EnqueueArgs(cl::NDRange(N)), d_a, d_b, d_c);
+  //// c = a+b
+  //vadd(cl::EnqueueArgs(cl::NDRange(N)), d_a, d_b, d_c);
 
-  // b = 3
-  setArrayTo(h_b, 3, N);
-  cl::copy(h_b.begin(), h_b.end(), d_b);
+  //// b = 3
+  //setArrayTo(h_b, 3, N);
+  //cl::copy(h_b.begin(), h_b.end(), d_b);
 
-  // a = b+c = 1+2+3
-  vadd(cl::EnqueueArgs(cl::NDRange(N), cl::NDRange(WORKGROUP_SIZE)), d_c, d_b, d_a);
+  //// a = b+c = 1+2+3
+  //vadd(cl::EnqueueArgs(cl::NDRange(N), cl::NDRange(WORKGROUP_SIZE)), d_c, d_b, d_a);
 
-  // Get result
-  cl::copy(d_a, h_a.begin(), h_a.end());
+  //// Get result
+  //cl::copy(d_a, h_a.begin(), h_a.end());
 
-  for(int i=0; i<N; ++i) {
-    assert(h_a[i] == 6);
-  }
 }
