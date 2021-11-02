@@ -221,6 +221,7 @@ int main() {
 
   verify_seq();
   verify_ocl("mat_mult_naive");
+  verify_ocl("mat_mult_local_var");
 
   std::vector<int> Ns = {128, 256, 512};
 
@@ -230,8 +231,13 @@ int main() {
 
     std::cout << "Seq:   ";
     run_seq(N, h_A, h_B, h_C_seq);
+
     std::cout << "Naive: ";
     run_ocl("mat_mult_naive", N, h_A, h_B, h_C);
+    check_equal(h_C, h_C_seq);
+
+    std::cout << "Local: ";
+    run_ocl("mat_mult_local_var", N, h_A, h_B, h_C);
     check_equal(h_C, h_C_seq);
   }
 }
