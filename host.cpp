@@ -80,11 +80,26 @@ inline int idx(int i, int j, int N) {
 void mat_mult(int N, float *A, float *B, float *C) {
   for (int i=0; i<N; ++i) {
     for (int j=0; j<N; ++j) {
-      C[idx(i,j,N)] = 0.0f;
+      float tmp=0.0;
       for(int k=0; k<N; ++k) {
         // C(i,j) = sum_k A(i,k)*B(k,i)
-        C[idx(i,j,N)] += A[idx(i,k,N)]*B[idx(k,j,N)];
+        tmp += A[idx(i,k,N)]*B[idx(k,j,N)];
       }
+      C[idx(i,j,N)] = tmp;
+    }
+  }
+}
+
+void mat_mult_omp(int N, float *A, float *B, float *C) {
+#pragma omp parallel for collapse(2)
+  for (int i=0; i<N; ++i) {
+    for (int j=0; j<N; ++j) {
+      float tmp=0.0;
+      for(int k=0; k<N; ++k) {
+        // C(i,j) = sum_k A(i,k)*B(k,i)
+        tmp += A[idx(i,k,N)]*B[idx(k,j,N)];
+      }
+      C[idx(i,j,N)] = tmp;
     }
   }
 }
@@ -147,6 +162,22 @@ void run_seq(
   auto start = high_resolution_clock::now();
 
   mat_mult(N, h_A.data(), h_B.data(), h_C.data());
+
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  double nflop = 2.0*N*N*N;
+  std::cout << "N=" << N << ", MFLOPS=" << int(nflop/float(duration.count())) << std::endl;
+}
+
+void run_seq_omp(
+    const int N,
+    std::vector<float>& h_A,
+    std::vector<float>& h_B,
+    std::vector<float>& h_C)
+{
+  auto start = high_resolution_clock::now();
+
+  mat_mult_omp(N, h_A.data(), h_B.data(), h_C.data());
 
   auto stop = high_resolution_clock::now();
   auto duration = duration_cast<microseconds>(stop - start);
@@ -263,15 +294,15 @@ void run_1d_wrk_ocl(
 
 void check_equal(const std::vector<float>& a, const std::vector<float>& b) {
   for (int i=0; i<a.size(); ++i) {
-    std::cout << a[i] << ", " << b[i] << std::endl;
+    //std::cout << a[i] << ", " << b[i] << std::endl;
     assert(std::abs(a[i]-b[i]) < EPSILON);
   }
 }
 
 int main() {
   // Setup OpenCL
-  int error = setDefaultPlatform("Intel(R) OpenCL HD Graphics");
-  //int error = setDefaultPlatform("Intel(R) CPU Runtime");
+  //int error = setDefaultPlatform("Intel(R) OpenCL HD Graphics");
+  int error = setDefaultPlatform("Intel(R) CPU Runtime");
   if (error < 0) return -1;
 
   cl::DeviceCommandQueue deviceQueue = cl::DeviceCommandQueue::makeDefault(
@@ -279,7 +310,7 @@ int main() {
 
   verify_seq();
 
-  std::vector<int> Ns = {128, 256, 512, 1024};
+  std::vector<int> Ns = {512};
 
   for (auto N : Ns) {
     std::vector<float> h_A(N*N), h_B(N*N), h_C(N*N), h_C_seq(N*N);
@@ -287,6 +318,10 @@ int main() {
 
     std::cout << "Seq:   ";
     run_seq(N, h_A, h_B, h_C_seq);
+
+    std::cout << "OMP:   ";
+    run_seq_omp(N, h_A, h_B, h_C);
+    check_equal(h_C, h_C_seq);
 
     std::cout << "Naive: ";
     run_ocl("mat_mult_naive", N, h_A, h_B, h_C);
@@ -300,8 +335,8 @@ int main() {
     run_1d_ocl("mat_mult_1d", N, h_A, h_B, h_C);
     check_equal(h_C, h_C_seq);
 
-    std::cout << "1D cc:  ";
-    run_1d_wrk_ocl("mat_mult_1d_col_copy", N, h_A, h_B, h_C);
-    check_equal(h_C, h_C_seq);
+    //std::cout << "1D cc:  ";
+    //run_1d_wrk_ocl("mat_mult_1d_col_copy", N, h_A, h_B, h_C);
+    //check_equal(h_C, h_C_seq);
   }
 }
