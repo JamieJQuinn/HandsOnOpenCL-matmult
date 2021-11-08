@@ -20,6 +20,7 @@ __kernel void mat_mult_local_var(
 ) {
   int i=get_global_id(0);
   int j=get_global_id(1);
+  // Use local accumulator
   float tmp = 0.0;
   for(int k=0; k<N; ++k) {
     tmp += A[i*N+k]*B[k*N+j];
@@ -34,6 +35,7 @@ __kernel void mat_mult_1d(
   __global float *C
 ) {
   int i=get_global_id(0);
+  // Each thread handles a column of B
   for(int j=0; j<N; ++j) {
     float tmp = 0.0;
     for(int k=0; k<N; ++k) {
@@ -55,6 +57,7 @@ __kernel void mat_mult_1d_col_copy(
   int nloc = get_local_size(0);
 
   for(int j=0; j<N; ++j) {
+    // Cache a copy of B
     for(int k=iloc; k<N; k+=nloc) {
       Bwrk[k] = B[k*N+j];
     }
